@@ -1,6 +1,6 @@
-# b365m-h-bios-ROM-recovory-log
-description about GIGABYTE b365m-h bios ROM troubleshooting.
 # Gigabyte B365M H BIOS 진입 불가 문제 분석 및 복구 기록
+Windows는 정상 부팅되지만 BIOS, Boot Menu 및 UEFI USB 부팅이
+동작하지 않는 Gigabyte B365M H 메인보드의 진단과 복구 과정을 기록한다.
 
 ## 1. 개요
 
