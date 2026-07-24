@@ -130,6 +130,7 @@ shutdown /r /fw /t 0
 
 ```text
 시스템이 요청된 부트 옵션을 찾을 수 없습니다. (203)
+![shutdown firmware error 203](images/symptom/shutdown-fw-error-203.png)
 ```
 
 이 오류만으로 BIOS 손상을 단정할 수는 없다. 하지만 Windows에서 펌웨어 진입 요청을 정상적으로 전달하지 못하는 정황으로 볼 수 있었다.
@@ -149,7 +150,7 @@ UEFI: SanDisk
 그러나 해당 항목을 선택해도 설치 USB로 부팅되지 않았다.
 
 이 결과 때문에 USB 제작 실패나 단순 부트 순서 문제보다는, UEFI 부팅 실행 단계 자체에 문제가 있을 가능성을 의심했다.
-
+![UEFI SanDisk device entry](images/symptom/uefi-sandisk.png)
 ---
 
 ## 4. 문제 발생 전 이력
@@ -224,7 +225,9 @@ bcdedit /enum firmware
 
 Windows BCD에 펌웨어 부트 항목이 완전히 사라진 상태는 아니었다.
 
-즉, Windows Boot Manager와 UEFI 부트 항목 구조는 대체로 정상적으로 유지되고 있었다.
+Windows BCD에서 Firmware Boot Manager와 관련 부트 항목이 확인되었다.
+따라서 부트 항목이 완전히 소실된 상태는 아닌 것으로 판단했다.
+다만 항목의 존재만으로 펌웨어 측 실행이 정상임을 보장하지는 않는다.
 
 ### 5.3 Windows Recovery Environment 확인
 
@@ -448,8 +451,9 @@ CH341A 재기록 이후에도 동일 증상이 지속되면 메인보드 하드�
 - 핫에어 리워크 장비
 - 플럭스
 - IC 탈거 도구
-- 1.8V 어댑터
+- 1.8V 어댑터 - 해당 모델은 3.3V를 사용해 호환되지 않음
 
+![B365M H BIOS chip location](images/hardware/bios-chip-location.jpg)
 사진상 BIOS 칩은 SOP8/SOIC8 패키지로 확인되었고, 주변 공간도 확보되어 있어 우선 납땜 없이 클립 방식으로 작업할 예정이다.
 
 단, 인서킷 상태에서 칩 인식이 되지 않거나 읽기 데이터가 불안정하면 칩 탈거가 필요할 수 있다.
