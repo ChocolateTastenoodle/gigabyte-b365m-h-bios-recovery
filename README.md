@@ -1,6 +1,5 @@
 # b365m-h-bios-ROM-recovory-log
 description about GIGABYTE b365m-h bios ROM troubleshooting.
-[README.md](https://github.com/user-attachments/files/30335746/README.md)
 # Gigabyte B365M H BIOS 진입 불가 문제 분석 및 복구 기록
 
 ## 1. 개요
