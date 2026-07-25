@@ -1,0 +1,36 @@
+Selected device: MX25L12872F [3.3V]
+Capacity: 128 Mbits / 16 Mbytes
+Programmer: CH341 Black
+
+13:13:01  Erasing memory...
+          Success
+          Execution time: 00:00:01.904
+
+13:13:10  Erasure control...
+          Success
+          Execution time: 00:02:26.289
+
+13:16:08  Reading memory... Main Memory
+          Success
+          Execution time: 00:02:26.427
+          CRC32 = 0x86175EBF
+
+13:18:52  Programming memory... Main Memory
+          Success
+          Execution time: 00:01:18.919
+
+13:20:29  Verify memory...
+          Success
+          Execution time: 00:02:26.008
+
+13:23:00  Reading memory... Main Memory
+          Success
+          Execution time: 00:02:26.453
+          CRC32 = 0x86175EBF
+
+Interpretation:
+- The read after erase replaced NeoProgrammer's buffer with blank 0xFF data.
+- Program and Verify then succeeded against that blank buffer.
+- CRC32 0x86175EBF identifies the blank 16 MiB image in this session.
+- The official F5a image and the later successful read-back both showed
+  CRC32 0x1275C846 in the retained screenshots.

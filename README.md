@@ -1,735 +1,124 @@
-# Gigabyte B365M H BIOS 진입 불가 문제 분석 및 복구 기록
-Windows는 정상 부팅되지만 BIOS, Boot Menu 및 UEFI USB 부팅이
-동작하지 않는 Gigabyte B365M H 메인보드의 진단과 복구 과정을 기록한다.
+# Gigabyte B365M H BIOS/UEFI 복구 사례
 
-## 목차
+Windows는 정상 부팅되지만 POST, BIOS 설정, F12 Boot Menu 및 UEFI USB 부팅이 동작하지 않던 Gigabyte B365M H Rev. 1.0을 CH341A로 복구한 기록이다.
 
-- [1. 개요](#1-개요)
-- [2. 시스템 구성](#2-시스템-구성)
-- [3. 핵심 증상](#3-핵심-증상)
-- [4. 문제 발생 전 이력](#4-문제-발생-전-이력)
-- [5. 수행한 진단 및 조치](#5-수행한-진단-및-조치)
-- [6. 배제하거나 가능성이 낮아진 원인](#6-배제하거나-가능성이-낮아진-원인)
-- [7. 주요 가설](#7-주요-가설)
-- [8. CH341A를 선택한 이유](#8-ch341a를-선택한-이유)
-- [9. 준비한 장비](#9-준비한-장비)
-- [10. CH341A 작업 전 준비](#10-ch341a-작업-전-준비)
-- [11. 예정된 복구 절차](#11-예정된-복구-절차)
-- [12. 성공 여부 판단 기준](#12-성공-여부-판단-기준)
-- [13. 실패 시 추가 확인 항목](#13-실패-시-추가-확인-항목)
-- [14. 현재 결론](#14-현재-결론)
-- [15. 이번 문제에서 배운 점](#15-이번-문제에서-배운-점)
-- [16. 저장소 구성](#16-저장소-구성)
-- [17. 복구 완료 후 추가할 내용](#17-복구-완료-후-추가할-내용)
+## 결과
 
-## 1. 개요
+Macronix MX25L12872F SPI Flash에 공식 F5a BIOS를 외부 프로그래밍한 뒤 모든 펌웨어 단계 기능이 정상화되었다.
 
-Gigabyte B365M H Rev.1.0 메인보드에서 Windows는 정상적으로 부팅되지만, BIOS/UEFI 설정 화면과 Boot Menu에는 진입할 수 없는 문제가 발생했다.
+| 확인 항목 | 복구 전 | 복구 후 |
+| --- | :---: | :---: |
+| Gigabyte 로고 및 POST | ❌ | ✅ |
+| `DEL` 키 BIOS 진입 | ❌ | ✅ |
+| `F12` Boot Menu | ❌ | ✅ |
+| Windows의 UEFI 펌웨어 설정 | ❌ | ✅ |
+| UEFI USB 부팅 | ❌ | ✅ |
+| Windows 부팅 | ✅ | ✅ |
 
-초기에는 단순한 Fast Boot 설정, 키보드 입력 문제, CMOS 설정 오류 또는 Windows 부트 구성 문제를 의심했다. 그러나 BIOS 진입 키 입력, Windows의 UEFI 펌웨어 설정, 명령어를 이용한 펌웨어 재부팅, UEFI USB 부팅 등 여러 경로가 모두 실패했다.
+## 문제 요약
 
-반면 Windows 자체는 정상적으로 부팅되었고, EFI 부트 항목과 Windows 복구 환경도 정상적으로 확인되었다.
+확인된 주요 증상:
 
-이 문서는 해당 문제를 해결하기 위해 수행한 진단 과정과 판단 근거, 실패한 조치, 최종적으로 CH341A 외부 프로그래머를 사용하기로 결정한 과정을 기록한 것이다.
+- Windows는 정상 부팅
+- Gigabyte 로고와 POST 화면 미표시
+- `DEL`, `F2`, `F12` 입력 무반응
+- Windows 고급 시작 옵션의 UEFI 펌웨어 설정 실패
+- `shutdown /r /fw /t 0` 실행 시 오류 203
+- WinRE에는 `UEFI: SanDisk`가 표시되지만 USB 부팅 실패
 
----
+![shutdown 펌웨어 부트 옵션 오류 203](images/symptom/shutdown-firmware-error-203.png)
 
-## 2. 시스템 구성
+Windows 부트 구성, WinRE, UEFI 모드와 USB 장치 탐지는 정상이었다. BIOS 업데이트와 CMOS 초기화 후 일시적으로 개선된 이력이 있어 BIOS/NVRAM 또는 SPI Flash 기록 상태를 우선 의심했다.
 
-| 항목 | 사양 |
-|---|---|
-| 메인보드 | Gigabyte B365M H Rev.1.0 |
-| CPU | Intel Core i5-9600KF |
-| 내장 그래픽 | 없음 |
-| 그래픽카드 | ASUS ROG STRIX GTX 1060 |
-| BIOS 버전 | F5a |
-| 기존 BIOS 버전 | F3 |
-| BIOS 업데이트 방식 | Gigabyte @BIOS |
-| 부팅 방식 | UEFI |
-| 운영체제 | Windows |
-| BIOS 플래시 칩 | Macronix(MXIC) 계열 128Mbit SPI Flash |
-| 예정된 복구 장비 | CH341A + SOIC8 테스트 클립 |
+상세 진단 과정: **[문제 인지 및 진단 기록](docs/diagnosis.md)**
 
-CPU가 `i5-9600KF`이므로 내장 그래픽을 사용할 수 없다. 따라서 POST 화면과 BIOS 화면 출력은 외장 그래픽카드에 의존한다.
+## 복구 요약
 
----
+사용 장비:
 
-## 3. 핵심 증상
-
-문제 발생 당시 확인된 증상은 다음과 같다.
-
-### 3.1 Windows는 정상적으로 부팅됨
-
-전원 버튼을 누르면 Windows는 정상적으로 실행되었다.
-
-운영체제 진입 후 일반적인 사용에도 특별한 문제는 없었다. 저장장치 인식, Windows Boot Manager, 로그인 과정 등은 정상적으로 동작했다.
-
-즉, 메인보드가 완전히 부팅 불가능한 상태는 아니었다.
-
-### 3.2 BIOS 진입 불가
-
-전원 인가 직후 다음 키를 반복 입력했지만 BIOS 설정 화면에 진입할 수 없었다.
-
-- `DEL`
-- `F2`
-
-키보드 전원은 들어왔으며, 부팅 초기부터 키보드 LED가 켜졌다. 따라서 USB 키보드 자체가 완전히 인식되지 않는 상황으로 보이지는 않았다.
-
-그럼에도 BIOS 진입 키는 반응하지 않았다.
-
-### 3.3 F12 Boot Menu 진입 불가
-
-Gigabyte 메인보드에서 일반적으로 사용하는 `F12` Boot Menu도 표시되지 않았다.
-
-이 증상은 단순히 BIOS 설정 화면만 열리지 않는 것이 아니라, 펌웨어 단계의 부팅 선택 메뉴 자체에도 접근할 수 없다는 의미였다.
-
-### 3.4 Gigabyte 로고와 POST 화면이 나타나지 않음
-
-정상적인 경우 전원 인가 직후 Gigabyte 로고나 POST 관련 화면이 잠시 표시되어야 한다.
-
-문제 발생 이후에는 해당 화면이 나타나지 않고 검은 화면이 유지되다가 Windows 로그인 화면으로 바로 넘어가는 형태가 되었다.
-
-초기 화면이 보이지 않는 원인으로 다음 가능성을 생각했다.
-
-- Ultra Fast Boot 또는 Fast Boot
-- 그래픽카드 GOP 초기화 문제
-- BIOS POST 화면 출력 문제
-- 펌웨어의 일부 초기화 오류
-- 모니터 입력 전환 지연
-
-그러나 이후 다른 증상들과 함께 판단했을 때, 단순히 화면만 보이지 않는 문제로 보기 어려웠다.
-
-### 3.5 Windows의 UEFI 펌웨어 설정 실패
-
-Windows 고급 시작 옵션에서 다음 경로를 사용했다.
-
-```text
-설정
-→ 시스템 복구
-→ 고급 시작 옵션
-→ 문제 해결
-→ 고급 옵션
-→ UEFI 펌웨어 설정
-```
-
-정상적인 시스템이라면 이 기능을 선택했을 때 재부팅 후 BIOS/UEFI 설정 화면으로 진입해야 한다.
-
-그러나 실제로는 BIOS 화면에 들어가지 못하고 다시 Windows로 돌아오거나, 펌웨어 설정 화면으로 전환되지 않았다.
-
-### 3.6 `shutdown /r /fw /t 0` 오류
-
-Windows 터미널 또는 명령 프롬프트에서 다음 명령을 실행했다.
-
-```powershell
-shutdown /r /fw /t 0
-```
-
-이 명령은 다음 재부팅 시 UEFI 펌웨어 설정 화면으로 진입하도록 요청하는 기능이다.
-
-실행 결과 다음 오류가 발생했다.
-
-```text
-시스템이 요청된 부트 옵션을 찾을 수 없습니다. (203)
-![shutdown firmware error 203](images/symptom/shutdown-fw-error-203.png)
-```
-
-이 오류만으로 BIOS 손상을 단정할 수는 없다. 하지만 Windows에서 펌웨어 진입 요청을 정상적으로 전달하지 못하는 정황으로 볼 수 있었다.
-
-### 3.7 UEFI USB 장치는 표시되지만 부팅 실패
-
-Microsoft Media Creation Tool을 사용해 Windows 설치 USB를 제작했다.
-
-Windows 복구 환경의 `장치 사용` 메뉴에서는 다음 항목이 표시되었다.
-
-```text
-UEFI: SanDisk
-```
-
-즉, Windows와 펌웨어 부트 항목 수준에서는 USB 장치가 UEFI 부팅 장치로 인식되고 있었다.
-
-그러나 해당 항목을 선택해도 설치 USB로 부팅되지 않았다.
-
-이 결과 때문에 USB 제작 실패나 단순 부트 순서 문제보다는, UEFI 부팅 실행 단계 자체에 문제가 있을 가능성을 의심했다.
-![UEFI SanDisk device entry](images/symptom/uefi-sandisk.png)
----
-
-## 4. 문제 발생 전 이력
-
-### 4.1 BIOS 업데이트
-
-기존 BIOS 버전은 F3였다.
-
-이후 Gigabyte의 Windows용 BIOS 업데이트 프로그램인 `@BIOS`를 이용해 BIOS를 F5a로 업데이트했다.
-
-업데이트 직후에는 BIOS 진입이 가능해졌다.
-
-이 점은 BIOS 재기록 또는 설정 초기화가 증상에 영향을 주었다는 의미로 볼 수 있었다.
-
-다만 BIOS 업데이트 이후 일정 시간이 지나면서 동일한 BIOS 진입 불가 증상이 다시 발생했다.
-
-### 4.2 CMOS 배터리 장착 오류
-
-과거 CMOS 배터리를 잘못된 방향으로 장착했던 이력이 있었다.
-
-이후 배터리 방향을 바로잡고 CMOS 초기화를 수행했을 때 BIOS 진입이 일시적으로 정상화되었다.
-
-그러나 이후 다시 문제가 재발했고, 배터리 제거와 CMOS 초기화만으로는 영구적으로 해결되지 않았다.
-
-### 4.3 자동 재시작 정황
-
-일부 부팅 과정에서 시스템이 자동으로 재시작을 시도하는 듯한 현상이 있었다.
-
-Gigabyte 메인보드는 메모리 트레이닝이나 BIOS 설정 변경, 부팅 실패 후 복구 과정에서 재부팅할 수 있다.
-
-하지만 이번 경우에는 BIOS 접근 불가와 UEFI 부팅 실패가 함께 나타났으므로 단순 메모리 트레이닝만의 문제로 보기는 어려웠다.
-
----
-
-## 5. 수행한 진단 및 조치
-
-### 5.1 BIOS 진입 키 테스트
-
-전원 인가 직후 다음 키를 반복 입력했다.
-
-```text
-DEL
-F2
-F12
-```
-
-#### 결과
-
-- BIOS 진입 실패
-- Boot Menu 진입 실패
-- POST 로고 표시되지 않음
-
-#### 판단
-
-단일 키 오작동 가능성은 낮다고 판단했다.
-
-### 5.2 Windows Firmware Boot Entry 확인
-
-다음 명령으로 펌웨어 부트 항목을 확인했다.
-
-```powershell
-bcdedit /enum firmware
-```
-
-#### 확인된 내용
-
-- Firmware Boot Manager 존재
-- Windows Boot Manager 존재
-- UEFI USB 관련 항목 존재
-
-#### 판단
-
-Windows BCD에 펌웨어 부트 항목이 완전히 사라진 상태는 아니었다.
-
-Windows BCD에서 Firmware Boot Manager와 관련 부트 항목이 확인되었다.
-따라서 부트 항목이 완전히 소실된 상태는 아닌 것으로 판단했다.
-다만 항목의 존재만으로 펌웨어 측 실행이 정상임을 보장하지는 않는다.
-
-### 5.3 Windows Recovery Environment 확인
-
-다음 명령을 실행했다.
-
-```powershell
-reagentc /info
-```
-
-#### 결과
-
-Windows Recovery Environment가 활성화되어 있었고, 복구 이미지 경로도 정상적으로 표시되었다.
-
-#### 판단
-
-WinRE 손상 때문에 UEFI 펌웨어 설정 진입이 실패한다고 보기 어려웠다.
-
-### 5.4 시스템 정보 확인
-
-`msinfo32`를 실행해 시스템 정보를 확인했다.
-
-#### 확인 결과
-
-```text
-BIOS 모드: UEFI
-BIOS 버전: F5a
-Secure Boot: 사용 안 함 또는 미구성
-```
-
-#### 판단
-
-Windows는 Legacy BIOS/CSM이 아니라 UEFI 방식으로 부팅되고 있었다.
-
-따라서 BIOS 진입 불가 현상을 단순히 Legacy 설치나 MBR 부팅 문제로 설명할 수 없었다.
-
-### 5.5 Windows 설치 USB 제작 및 테스트
-
-Microsoft Media Creation Tool을 이용해 설치 USB를 만들었다.
-
-WinRE에서 USB가 다음과 같이 표시되었다.
-
-```text
-UEFI: SanDisk
-```
-
-#### 결과
-
-장치는 인식되었지만 실제 USB 부팅은 실패했다.
-
-#### 판단
-
-USB 장치 인식 자체는 되고 있었다. 그러나 펌웨어가 해당 UEFI 부트 엔트리를 실행하거나 화면을 전환하는 과정에서 문제가 발생했을 가능성이 있었다.
-
-### 5.6 CMOS 초기화
-
-다음 절차로 CMOS 초기화를 수행했다.
-
-1. PC 종료
-2. 파워서플라이 스위치 OFF
-3. 전원 케이블 분리
-4. CMOS 배터리 제거
-5. 전원 버튼을 눌러 잔류 전하 방전
-6. 일정 시간 후 배터리 재장착
-7. 시스템 재부팅
-
-#### 결과
-
-과거에는 CMOS 초기화 후 BIOS 진입이 일시적으로 가능해진 적이 있었다.
-
-그러나 이후 같은 절차를 다시 수행했을 때는 문제가 완전히 해결되지 않았다.
-
-#### 판단
-
-단순 BIOS 설정값의 문제라면 CMOS 초기화로 지속적으로 복구되어야 한다.
-
-일시적인 정상화 후 재발했다는 점에서 다음 가능성을 고려했다.
-
-- NVRAM 데이터 이상
-- BIOS 설정 저장 영역 손상
-- SPI Flash의 일부 영역 오류
-- BIOS 이미지 불완전 기록
-- 메인보드 전원 또는 초기화 회로 문제
-
-### 5.7 Event Viewer 확인
-
-Windows Event Viewer에서 부팅 관련 로그를 확인했다.
-
-#### 결과
-
-Kernel-Boot 관련 이벤트는 있었지만 대부분 정보성 이벤트였다.
-
-BIOS 진입 불가 문제를 직접 설명할 수 있는 명확한 오류 로그는 발견하지 못했다.
-
-#### 판단
-
-문제가 Windows 커널 로드 이후가 아니라 그 이전 펌웨어 단계에서 발생할 가능성이 높으므로, Windows 로그만으로 원인을 찾는 데 한계가 있었다.
-
-### 5.8 TPM 상태 확인
-
-TPM 상태가 정상적으로 준비된 것으로 확인되었다.
-
-#### 판단
-
-TPM 자체가 시스템 부팅을 차단하거나 펌웨어 진입을 방해하는 정황은 없었다.
-
----
-
-## 6. 배제하거나 가능성이 낮아진 원인
-
-진단 결과 다음 원인들은 우선순위가 낮아졌다.
-
-### 6.1 Windows 설치 손상
-
-Windows는 정상 부팅되었으며 WinRE도 정상 상태였다.
-
-따라서 운영체제 자체의 치명적인 손상 가능성은 낮았다.
-
-### 6.2 BCD 완전 손상
-
-`bcdedit /enum firmware`에서 Firmware Boot Manager와 Windows Boot Manager가 확인되었다.
-
-따라서 BCD가 완전히 손상되었거나 UEFI 부트 항목이 모두 사라진 상태는 아니었다.
-
-### 6.3 단순 USB 제작 실패
-
-USB는 UEFI 장치로 표시되었다.
-
-물론 다른 USB나 Rufus 등으로 추가 검증할 수는 있지만, BIOS와 F12 Boot Menu에도 진입할 수 없다는 점을 함께 보면 USB 하나만의 문제로 보기는 어려웠다.
-
-### 6.4 단순 키보드 고장
-
-전원 인가 직후 키보드 LED가 켜졌으며 여러 키를 사용해도 동일한 결과가 발생했다.
-
-따라서 키보드 한 개의 고장이나 특정 키 문제 가능성은 낮았다.
-
-### 6.5 Secure Boot 문제
-
-Secure Boot는 사용하지 않는 상태였다.
-
-따라서 Secure Boot가 설치 USB 실행을 거부한 상황으로 보기는 어려웠다.
-
----
-
-## 7. 주요 가설
-
-현재까지의 진단을 바탕으로 다음 가능성을 남겨두었다.
-
-### 7.1 BIOS 펌웨어 이미지 일부 손상
-
-`@BIOS`를 이용한 Windows 환경 업데이트 이후 BIOS 접근이 일시적으로 정상화되었다가 재발했다.
-
-펌웨어 이미지 일부가 불완전하게 기록되었거나, 특정 영역의 데이터가 손상되었을 가능성이 있다.
-
-### 7.2 NVRAM 영역 이상
-
-BIOS 설정과 UEFI 부트 변수는 SPI Flash 내부의 NVRAM 영역에 저장될 수 있다.
-
-CMOS 초기화 후 일시적으로 상태가 개선되었다는 점에서 NVRAM 데이터가 비정상적이거나 반복적으로 손상되었을 가능성을 고려했다.
-
-다만 이는 현재 단계에서는 가설이며, 실제 덤프 분석 전에는 확정할 수 없다.
-
-### 7.3 SPI Flash 칩 자체 이상
-
-BIOS가 저장된 SPI Flash 칩에 쓰기 불량 또는 특정 섹터 오류가 있을 가능성이 있다.
-
-이 경우 BIOS를 다시 기록하면 일시적으로 정상화되었다가 다시 문제가 나타날 수 있다.
-
-CH341A로 읽은 덤프가 매번 다르거나 Verify가 반복적으로 실패할 경우 플래시 칩 자체의 문제를 의심할 수 있다.
-
-### 7.4 그래픽카드 GOP 또는 POST 출력 문제
-
-CPU에 내장 그래픽이 없으므로 BIOS 화면 출력은 GTX 1060에 의존한다.
-
-따라서 그래픽카드의 GOP 초기화나 모니터 출력 전환 문제가 POST 화면을 보이지 않게 만들 가능성도 있다.
-
-그러나 UEFI USB 부팅과 Windows 펌웨어 진입 요청까지 실패했기 때문에, 단순 화면 출력 문제만으로 전체 증상을 설명하기는 어렵다고 판단했다.
-
-### 7.5 메인보드 기타 하드웨어 문제
-
-다음과 같은 보드 수준의 문제도 완전히 배제할 수 없다.
-
-- SPI Flash 전원 공급 이상
-- 칩셋 초기화 문제
-- Super I/O 관련 문제
-- 보드 전원 회로 이상
-- 펌웨어 리셋 회로 이상
-
-CH341A 재기록 이후에도 동일 증상이 지속되면 메인보드 하드웨어 문제의 가능성이 높아진다.
-
----
-
-## 8. CH341A를 선택한 이유
-
-일반적인 BIOS 복구 방법은 다음과 같다.
-
-- BIOS 설정 초기화
-- Q-Flash
-- Windows용 BIOS 업데이트 프로그램
-- USB BIOS Flashback
-- DualBIOS 복구
-
-하지만 해당 메인보드는 현재 BIOS 설정 화면에 진입할 수 없고, Q-Flash에도 접근할 수 없다.
-
-또한 일반적인 USB BIOS Flashback 전용 버튼이 있는 구조도 아니다.
-
-따라서 메인보드에 납땜된 SPI Flash 칩에 직접 접근해 BIOS를 읽고 다시 기록하기 위해 CH341A를 선택했다.
-
----
-
-## 9. 준비한 장비
-
-### 필수 장비
-
-- CH341A USB 프로그래머
+- CH341A Black Edition
 - SOIC8 테스트 클립
-- SOIC8 연결 케이블
+- NeoProgrammer 2.2.0.10
+- Gigabyte 공식 F5a BIOS
 
-### 현재 작업에서 불필요한 장비
+실제 SPI Flash는 `MX25L12872F [3.3V]`, 128 Mbit였다.
 
-- 납땜 인두
-- 핫에어 리워크 장비
-- 플럭스
-- IC 탈거 도구
-- 1.8V 어댑터 - 해당 모델은 3.3V를 사용해 호환되지 않음
+![CH341A Black Edition과 SOIC8 클립](images/recovery/equipment-overview.jpeg)
 
-![B365M H BIOS chip location](images/hardware/bios-chip-location.jpg)
-사진상 BIOS 칩은 SOP8/SOIC8 패키지로 확인되었고, 주변 공간도 확보되어 있어 우선 납땜 없이 클립 방식으로 작업할 예정이다.
-
-단, 인서킷 상태에서 칩 인식이 되지 않거나 읽기 데이터가 불안정하면 칩 탈거가 필요할 수 있다.
-
----
-
-## 10. CH341A 작업 전 준비
-
-메인보드에 외부 전원이 남아 있는 상태에서 CH341A를 연결하면 장비나 메인보드에 손상을 줄 수 있다.
-
-따라서 다음 절차로 준비한다.
-
-1. Windows 정상 종료
-2. 파워서플라이 스위치 OFF
-3. AC 전원 케이블 분리
-4. CMOS 배터리 제거
-5. 케이스 전원 버튼을 10~15초 눌러 잔류 전하 방전
-6. 그래픽카드 제거
-7. BIOS 칩 위치와 1번 핀 방향 확인
-8. SOIC8 클립 연결
-9. CH341A를 별도 PC의 USB 포트에 연결
-
-CPU와 RAM은 반드시 제거할 필요는 없다.
-
-다만 그래픽카드는 BIOS 칩 접근을 방해할 수 있으므로 제거하는 편이 안전하다.
-
----
-
-## 11. 예정된 복구 절차
-
-CH341A 작업은 다음 순서로 진행할 예정이다.
-
-### 11.1 BIOS 칩 식별
-
-프로그래머 소프트웨어에서 BIOS 칩 제조사와 모델을 확인한다.
-
-현재 사진상 Macronix(MXIC) 128Mbit 계열 SPI Flash로 추정된다.
-
-정확한 모델명은 칩 표면 마킹 또는 소프트웨어 인식 결과로 최종 확인한다.
-
-### 11.2 기존 BIOS 덤프 읽기
-
-바로 삭제하거나 덮어쓰지 않고, 먼저 현재 BIOS 내용을 읽는다.
-
-읽은 파일은 다음과 같이 여러 개 저장할 예정이다.
+복구 순서:
 
 ```text
-dump_01.bin
-dump_02.bin
-dump_03.bin
+Read original
+→ Save backup
+→ Erase
+→ Blank 확인
+→ Open BIOS image
+→ Program
+→ Verify
+→ Read-back
 ```
 
-### 11.3 덤프 일치 여부 확인
+공식 F5a 이미지와 최종 Read-back의 CRC32는 모두 `0x1275C846`이었다.
 
-같은 칩을 여러 번 읽었을 때 덤프가 모두 동일해야 한다.
+![최종 Read-back의 ASCII 데이터와 CRC32](images/recovery/final-readback-ascii-crc-1275c846.png)
 
-예를 들어 SHA-256 해시를 비교한다.
+상세 작업 과정: **[CH341A BIOS 복구 기록](docs/recovery.md)**
 
-```powershell
-Get-FileHash .\dump_01.bin -Algorithm SHA256
-Get-FileHash .\dump_02.bin -Algorithm SHA256
-Get-FileHash .\dump_03.bin -Algorithm SHA256
-```
+## 작업 중 겪은 핵심 시행착오
 
-해시가 서로 다르면 다음 문제가 있을 수 있다.
+Erase 후 빈 Flash를 확인하기 위해 `Read`를 실행하자 NeoProgrammer Buffer의 BIOS 이미지가 `FF`로 덮어써졌다.
 
-- SOIC8 클립 접촉 불량
-- 칩 선택 오류
-- 보드의 다른 회로 간섭
-- 전원 상태 문제
-- SPI Flash 자체 불량
+이 상태에서 Program과 Verify를 실행했기 때문에 잘못된 빈 데이터였음에도 둘 다 `Success`가 표시되었다.
 
-덤프가 일치하기 전에는 절대 Erase 또는 Write를 진행하지 않는다.
+![FF Buffer를 Program하고도 Success가 표시된 화면](images/recovery/mistaken-program-ff-success.png)
 
-### 11.4 원본 BIOS 백업
+Verify는 펌웨어가 올바른지 판단하는 것이 아니라 현재 Buffer와 Flash가 일치하는지 비교한다. 따라서 Erase 후 Read했다면 BIOS 파일을 다시 열어 Buffer를 복원해야 한다.
 
-정상적으로 반복 읽기가 확인되면 원본 덤프를 별도 보관한다.
+## 최종 판단
 
-백업 파일은 GitHub 공개 저장소에 업로드하지 않을 예정이다.
+SPI Flash 재기록 후 POST, BIOS 설정, Boot Menu와 UEFI 부팅이 함께 정상화되었다.
 
-BIOS 덤프에는 다음 정보가 포함될 가능성이 있기 때문이다.
+따라서 BIOS/NVRAM 또는 SPI Flash 기록 상태의 이상이 원인이었을 가능성이 가장 높다. 다만 손상 전후 이미지를 영역별로 분석하지 않았으므로 정확한 손상 영역과 Flash 칩 자체의 물리적 불량 여부는 확정하지 않았다.
 
-- 메인보드 시리얼 정보
-- UUID
-- MAC 주소 관련 데이터
-- 펌웨어 설정값
-- 제조사별 보드 고유 데이터
-
-### 11.5 공식 BIOS 이미지 준비
-
-Gigabyte 공식 BIOS 파일 F5a를 사용한다.
-
-다만 제조사에서 제공하는 BIOS 업데이트 파일이 SPI Flash 전체 이미지와 동일한 크기와 구조인지 확인해야 한다.
-
-공식 파일을 무조건 칩 전체에 직접 기록하면 보드 고유 정보가 손실될 수 있으므로 다음 사항을 확인할 필요가 있다.
-
-- 공식 BIOS 파일 용량
-- 현재 덤프 용량
-- Intel Flash Descriptor 포함 여부
-- ME Region 포함 여부
-- BIOS Region만 제공되는지 여부
-- 캡슐 헤더 존재 여부
-
-필요한 경우 원본 덤프의 보드 고유 영역을 유지한 상태로 BIOS 영역만 교체한다.
-
-### 11.6 Erase
-
-정상적인 백업과 이미지 준비가 끝난 뒤 SPI Flash를 삭제한다.
-
-Erase 후 Blank Check를 수행해 칩이 완전히 비워졌는지 확인한다.
-
-### 11.7 Write
-
-준비한 BIOS 이미지를 SPI Flash에 기록한다.
-
-### 11.8 Verify
-
-기록 직후 Verify를 수행한다.
-
-Verify 실패 시 부팅을 시도하지 않고 다음 항목을 점검한다.
-
-- 클립 접촉
-- 칩 모델 선택
-- 프로그래머 전압
-- 이미지 크기
-- 칩 상태
-- 인서킷 프로그래밍 간섭
-
-### 11.9 재조립 및 첫 부팅
-
-기록이 정상적으로 완료되면 다음 순서로 복구한다.
-
-1. CH341A USB 분리
-2. SOIC8 클립 제거
-3. CMOS 배터리 재장착
-4. 그래픽카드 장착
-5. 전원 연결
-6. 첫 부팅 시 충분히 대기
-7. BIOS 진입 확인
-8. Load Optimized Defaults 적용
-9. 부팅 순서와 저장장치 확인
-10. Windows 부팅 확인
-
-첫 부팅에서는 펌웨어 초기화나 메모리 트레이닝 때문에 재부팅이 반복될 수 있다.
-
----
-
-## 12. 성공 여부 판단 기준
-
-CH341A 복구 성공 여부는 다음 항목으로 판단할 예정이다.
-
-- Gigabyte 로고 또는 POST 화면 표시
-- `DEL` 키로 BIOS 진입 가능
-- `F12` Boot Menu 진입 가능
-- Windows 고급 시작 옵션에서 UEFI 펌웨어 설정 진입 가능
-- `shutdown /r /fw /t 0` 정상 동작
-- UEFI USB 부팅 가능
-- Windows 정상 부팅
-- BIOS 설정 저장 후 재부팅해도 증상 재발 없음
-
----
-
-## 13. 실패 시 추가 확인 항목
-
-CH341A 재기록 이후에도 문제가 해결되지 않으면 다음 순서로 점검한다.
-
-### 13.1 그래픽카드 또는 출력 경로 테스트
-
-- 다른 HDMI/DisplayPort 케이블 사용
-- 다른 모니터 사용
-- 다른 그래픽카드 사용
-- 모니터 입력 소스 수동 고정
-
-CPU가 KF 모델이므로 메인보드 영상 출력 단자는 사용할 수 없다.
-
-### 13.2 최소 구성 부팅
-
-다음 구성만 남기고 부팅한다.
-
-- 메인보드
-- CPU
-- CPU 쿨러
-- RAM 1개
-- 그래픽카드
-- 파워서플라이
-- 키보드
-- 모니터
-
-SSD와 USB 장치를 모두 제거한 상태에서 BIOS 진입 여부를 확인한다.
-
-### 13.3 SPI Flash 칩 불량 확인
-
-다음 증상이 나타나면 BIOS 칩 불량 가능성이 높다.
-
-- 반복 읽기 덤프가 매번 다름
-- Erase 실패
-- Blank Check 실패
-- Write 실패
-- Verify 실패
-- 재기록 직후 정상화되지만 다시 빠르게 재발
-
-이 경우 동일 규격의 SPI Flash 칩으로 교체하는 방법을 고려한다.
-
-### 13.4 메인보드 교체 판단
-
-정상 BIOS 이미지가 Verify까지 완료되었고, 그래픽카드와 최소 구성 테스트에도 동일 증상이 지속되면 메인보드의 다른 하드웨어 결함일 가능성이 높다.
-
-보드의 연식과 교체 비용을 고려해 수리 또는 메인보드 교체를 판단한다.
-
----
-
-## 14. 현재 결론
-
-현재까지 Windows 부트 구성, WinRE, UEFI 모드, USB 장치 인식에는 뚜렷한 이상이 확인되지 않았다.
-
-반면 BIOS 진입, Boot Menu, UEFI 펌웨어 설정, UEFI USB 실행은 모두 실패했다.
-
-또한 BIOS 업데이트와 CMOS 초기화 후 일시적으로 정상화된 이력이 있다.
-
-따라서 현시점에서는 다음 원인을 우선 의심하고 있다.
-
-1. BIOS 펌웨어 또는 NVRAM 영역 이상
-2. SPI Flash의 기록 상태 문제
-3. SPI Flash 칩 자체의 부분 불량
-4. 메인보드 펌웨어 초기화 관련 하드웨어 문제
-5. 그래픽카드 GOP 또는 POST 출력 문제
-
-아직 CH341A 복구를 수행하기 전이므로 최종 원인은 확정하지 않았다.
-
----
-
-## 15. 이번 문제에서 배운 점
-
-이번 진단을 통해 Windows 부팅과 BIOS 펌웨어 상태는 서로 분리해서 판단해야 한다는 점을 확인했다.
-
-Windows가 정상 부팅된다는 사실만으로 BIOS가 정상이라고 볼 수 없다.
-
-UEFI 시스템에서는 다음 구성요소들이 서로 연결되어 있지만 각각 별도의 문제를 가질 수 있다.
-
-- SPI Flash
-- BIOS/UEFI Firmware
-- NVRAM
-- Firmware Boot Manager
-- Windows Boot Manager
-- EFI System Partition
-- WinRE
-- Secure Boot
-- TPM
-- GPU GOP
-
-또한 CMOS 초기화는 설정값을 초기화하는 작업이지, 손상된 BIOS 펌웨어 전체를 다시 기록하는 작업은 아니다.
-
-일반적인 BIOS 업데이트 도구나 Q-Flash를 사용할 수 없는 상황에서는 CH341A와 같은 외부 SPI 프로그래머가 최종적인 복구 수단이 될 수 있다.
-
----
-
-## 16. 저장소 구성 예시
+## 문서 구성
 
 ```text
-gigabyte-b365m-h-bios-recovery/
+.
 ├─ README.md
 ├─ docs/
-│  ├─ troubleshooting-log.md
-│  ├─ ch341a-procedure.md
-│  └─ result.md
+│  ├─ diagnosis.md
+│  └─ recovery.md
 ├─ images/
-│  ├─ motherboard-overview.jpg
-│  ├─ bios-chip-closeup.jpg
-│  ├─ ch341a-setup.jpg
-│  └─ error-203.jpg
-├─ hashes/
-│  └─ dump-hashes.txt
-└─ .gitignore
+│  ├─ symptom/
+│  │  ├─ README.md
+│  │  ├─ bcdedit-firmware-entries.png
+│  │  ├─ bios-chip-location.jpeg
+│  │  ├─ event-viewer-kernel-boot.png
+│  │  ├─ shutdown-firmware-error-203.png
+│  │  └─ system-information-uefi-bios-f5a.png
+│  └─ recovery/
+└─ logs/
+   └─ neoprogrammer-session.log
 ```
 
-`.gitignore`에는 BIOS 덤프 파일이 올라가지 않도록 다음 항목을 추가할 수 있다.
+- [`docs/diagnosis.md`](docs/diagnosis.md): 문제 인지, 진단 명령, 배제한 원인과 복구 전 가설
+- [`docs/recovery.md`](docs/recovery.md): 사진, 작업 로그, 실패한 시도와 최종 복구 결과
+- [`images/symptom/README.md`](images/symptom/README.md): 증상 이미지의 이전/새 파일명과 설명
+- [`logs/neoprogrammer-session.log`](logs/neoprogrammer-session.log): NeoProgrammer 작업 로그
+
+## 주의사항
+
+> [!WARNING]
+> CH341A 작업은 SPI Flash를 직접 읽고 쓰는 과정이다. 잘못된 전압, 반대 방향 연결, 불완전한 백업 또는 잘못된 이미지 기록은 메인보드를 부팅 불가능하게 만들 수 있다.
+
+- 메인보드 전원과 CMOS 배터리를 분리한다.
+- 칩 전압과 Pin 1 방향을 확인한다.
+- 반복 Read 결과가 일치하기 전에는 Erase하지 않는다.
+- 공식 이미지와 원본 덤프의 크기와 구조를 확인한다.
+- Program 후 Verify와 Read-back을 모두 수행한다.
+- 보드 고유 정보가 포함될 수 있는 원본 덤프는 공개하지 않는다.
+
+## `.gitignore`
 
 ```gitignore
 *.bin
@@ -739,55 +128,3 @@ gigabyte-b365m-h-bios-recovery/
 backups/
 dumps/
 ```
-
----
-
-## 17. 복구 완료 후 추가할 내용
-
-작업 완료 후 다음 항목을 추가할 예정이다.
-
-### 복구 결과
-
-```text
-- BIOS Read: 성공/실패
-- Erase: 성공/실패
-- Write: 성공/실패
-- Verify: 성공/실패
-- BIOS 진입: 성공/실패
-- F12 Boot Menu: 성공/실패
-- UEFI USB 부팅: 성공/실패
-- Windows 부팅: 성공/실패
-```
-
-### 최종 원인
-
-현재는 미확정이다.
-
-복구 결과에 따라 다음 중 하나로 정리할 예정이다.
-
-- BIOS 이미지 손상
-- NVRAM 손상
-- SPI Flash 접촉 또는 기록 문제
-- SPI Flash 칩 불량
-- 그래픽 출력 문제
-- 메인보드 하드웨어 불량
-
-### 최종 교훈
-
-단순히 “BIOS를 다시 설치해서 해결했다”가 아니라, 어떤 증거를 바탕으로 Windows 문제를 배제했고 왜 외부 프로그래밍을 선택했는지 정리할 예정이다.
-
----
-
-## 주의사항
-
-공식 F5a BIOS 파일을 그대로 SPI Flash 전체에 기록하는 것은 보드 고유 데이터 손실 가능성이 있다.
-
-따라서 실제 기록 전에는 반드시 다음을 확인해야 한다.
-
-- 원본 덤프를 여러 번 읽어 동일성 검증
-- 공식 BIOS 파일과 원본 덤프의 크기 비교
-- BIOS Region, Intel ME Region, Flash Descriptor 구조 확인
-- 보드 고유 데이터 보존 여부 확인
-- Write 이후 Verify 성공 여부 확인
-
-원본 덤프가 안정적으로 확보되기 전에는 Erase나 Write를 진행하지 않는다.
