@@ -1,4 +1,4 @@
-# Gigabyte B365M H BIOS/UEFI 복구 사례
+# Gigabyte B365M H BIOS/UEFI 복구 
 
 Windows는 정상 부팅되지만 POST, BIOS 설정, F12 Boot Menu 및 UEFI USB 부팅이 동작하지 않던 Gigabyte B365M H Rev. 1.0을 CH341A로 복구한 기록이다.
 
